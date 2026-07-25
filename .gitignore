@@ -1,0 +1,17 @@
+# ── Frontend ──
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+
+# ── Backend (Python) ──
+backend/venv/
+backend/.env
+backend/__pycache__/
+**/__pycache__/
+*.pyc
+
+# ── OS / editor ──
+.DS_Store
+*.log

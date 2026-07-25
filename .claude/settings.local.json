@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm -v)",
+      "Bash(npm install *)",
+      "WebFetch(domain:github.com)",
+      "WebSearch",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:site.api.espn.com)",
+      "Bash(cd \"/Users/leetam14/Downloads/Fantasy Football Team Website\" && mkdir -p backend && echo \"created backend/\")",
+      "Bash(python3 -m venv venv)",
+      "Bash(./venv/bin/pip install *)",
+      "Bash(./venv/bin/python -c \"import fastapi, uvicorn, espn_api, httpx, dotenv; print\\('all imports OK'\\)\")",
+      "Bash(node verify_ui.mjs)",
+      "Bash(npm ls *)",
+      "Bash(npm init *)",
+      "Bash(npm run *)",
+      "Bash(./backend/venv/bin/python -m py_compile backend/main.py backend/espn_client.py)",
+      "Bash(./venv/bin/python -c \"import os; os.environ.setdefault\\('LEAGUE_ID','1'\\); import main; print\\('FastAPI app loads:', main.app.title\\)\")"
+    ],
+    "additionalDirectories": [
+      "/Users/leetam14/Downloads/Fantasy Football Team Website"
+    ]
+  }
+}

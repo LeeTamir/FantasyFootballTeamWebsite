@@ -1,0 +1,15 @@
+@import './fonts.css';
+@import './tailwind.css';
+@import './theme.css';
+
+/* Scrolling headline ticker (see the <Ticker> component in App.tsx).
+   The track holds two identical copies; shifting it left by half its width
+   lands the second copy exactly where the first began — a seamless loop. */
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track { animation: none !important; }
+}
