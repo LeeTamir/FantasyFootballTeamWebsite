@@ -569,13 +569,25 @@ export default function App() {
   const [isLive, setIsLive] = useState(false);
   const [newsFilter, setNewsFilter] = useState<"ALL" | "NEWS" | "RUMOR" | "INJURY">("ALL");
 
+  // Fetch live data on mount, then refresh every 60s so scores and news stay
+  // current during games, plus an immediate refresh whenever the tab regains
+  // focus. Each call is independent — one failing shouldn't blank the others.
   useEffect(() => {
-    const ctrl = new AbortController();
-    // Each call is independent — one failing shouldn't blank the others.
-    api.team(ctrl.signal).then((t) => { setTeam(t); setIsLive(true); }).catch(() => {});
-    api.schedule(ctrl.signal).then((s) => { if (s.length) { setSchedule(s); setIsLive(true); } }).catch(() => {});
-    api.news(ctrl.signal).then((n) => { if (n.length) { setNews(n); setIsLive(true); } }).catch(() => {});
-    return () => ctrl.abort();
+    let cancelled = false;
+    const load = () => {
+      api.team().then((t) => { if (!cancelled) { setTeam(t); setIsLive(true); } }).catch(() => {});
+      api.schedule().then((s) => { if (!cancelled && s.length) { setSchedule(s); setIsLive(true); } }).catch(() => {});
+      api.news().then((n) => { if (!cancelled) { setNews(n); setIsLive(true); } }).catch(() => {});
+    };
+    load();
+    const id = setInterval(load, 60_000);
+    const onVisible = () => { if (document.visibilityState === "visible") load(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
 
   // Always land at the top of a section when switching (nav bar or home cards).
@@ -931,7 +943,9 @@ export default function App() {
 
           <div style={{ border: "1px solid rgba(255,255,255,0.07)" }}>
             {filteredNews.length > 0 ? (
-              filteredNews.map((item, i) => <NewsCard key={i} item={item} />)
+              filteredNews.map((item) => (
+                <NewsCard key={`${item.published}|${item.headline}`} item={item} />
+              ))
             ) : (
               <p className="text-center text-sm p-8" style={{ color: "#4b5563" }}>
                 No {EMPTY_LABEL[newsFilter]} right now.
