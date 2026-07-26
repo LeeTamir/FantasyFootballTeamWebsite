@@ -51,10 +51,6 @@ const ROSTER_SLOTS = [
     desc: "The possession threat. Precise routes, reliable hands in traffic, and a knack for finding the end zone. The kind of receiver who quietly puts up 12–15 points without ever being the flashy pick.",
   },
   {
-    pos: "WR", label: "Wide Receiver", num: "14",
-    desc: "The deep threat. A vertical weapon who stretches defenses, opens up the run game, and has home-run ability every time he lines up. One big game changes a week entirely.",
-  },
-  {
     pos: "TE", label: "Tight End", num: "87",
     desc: "An elite tight end is a matchup nightmare — too fast for linebackers, too physical for safeties. This slot is reserved for a player who gives a genuine positional advantage over the rest of the league.",
   },
@@ -72,11 +68,31 @@ const ROSTER_SLOTS = [
   },
   {
     pos: "BN", label: "Bench", num: "—",
-    desc: "The depth chart. A bye-week plug or a handcuff waiting to explode — bench management is where championships are quietly won and lost. These spots hold the roster's insurance policy.",
+    desc: "The depth chart. A bye-week plug or a handcuff waiting to explode — bench management is where championships are quietly won and lost. This spot holds the roster's first insurance policy.",
   },
   {
     pos: "BN", label: "Bench", num: "—",
-    desc: "The stash. Every great team has a high-upside sleeper sitting on the bench, waiting for an injury or a breakout. This is the spot where end-of-draft value turns into playoff heroics.",
+    desc: "The stash. Every great team has a high-upside sleeper sitting on the bench, waiting for an injury or a breakout. This is where end-of-draft value turns into playoff heroics.",
+  },
+  {
+    pos: "BN", label: "Bench", num: "—",
+    desc: "The handcuff. The backup who inherits a bell-cow workload the moment a starter goes down. Owning the right handcuff can swing an entire season — insurance you hope you never need.",
+  },
+  {
+    pos: "BN", label: "Bench", num: "—",
+    desc: "The upside swing. A boom-or-bust flier with league-winning ceiling. Some weeks he's unstartable, but the one time he pops, he wins you the matchup outright.",
+  },
+  {
+    pos: "BN", label: "Bench", num: "—",
+    desc: "The rookie. Raw, unproven, and dripping with potential. A developmental stash who could force his way into the starting lineup by midseason — patience is the play.",
+  },
+  {
+    pos: "BN", label: "Bench", num: "—",
+    desc: "The streamer. A rotating matchup play — the favorable QB, TE, or defense of the week. This spot never belongs to one player; it belongs to whoever has the softest matchup.",
+  },
+  {
+    pos: "BN", label: "Bench", num: "—",
+    desc: "The trade chip. Depth with real value — a piece to package in a deal or plug in when injuries strike. Every contender needs surplus, and this is where it lives.",
   },
 ];
 
@@ -867,7 +883,7 @@ export default function App() {
               </h2>
               <div className="h-0.5 w-24 mx-auto mt-5" style={{ background: "linear-gradient(90deg, transparent, #c9961a, transparent)" }} />
               <p className="mt-5 max-w-md mx-auto text-sm leading-relaxed" style={{ color: "#6b7280" }}>
-                12 roster spots. 1 draft. Every position below is a declaration of intent — check back August 7th to see who fills the jersey.
+                16 roster spots. 1 draft. Every position below is a declaration of intent — check back August 7th to see who fills the jersey.
               </p>
             </div>
           </div>
@@ -886,7 +902,7 @@ export default function App() {
               className="text-xs font-bold tracking-widest uppercase"
               style={{ color: "#c9961a", fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: "0.3em" }}
             >
-              12 Positions · Draft Night Aug 7
+              16 Positions · Draft Night Aug 7
             </div>
             <p className="text-xs text-center max-w-xs" style={{ color: "#374151" }}>
               Roster will be updated live following the draft
