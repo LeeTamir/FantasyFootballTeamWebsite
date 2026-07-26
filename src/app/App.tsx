@@ -294,7 +294,7 @@ function CountdownBlock({ value, label }: { value: number; label: string }) {
   return (
     <div className="flex flex-col items-center gap-1">
       <div
-        className="relative flex items-center justify-center w-24 h-24 md:w-32 md:h-32"
+        className="relative flex items-center justify-center w-20 h-20 md:w-32 md:h-32"
         style={{
           background: "linear-gradient(160deg, #161c27 60%, #1e2534)",
           border: "1px solid rgba(201,150,26,0.25)",
@@ -302,7 +302,7 @@ function CountdownBlock({ value, label }: { value: number; label: string }) {
         }}
       >
         <span
-          className="text-5xl md:text-6xl font-bold tabular-nums leading-none"
+          className="text-4xl md:text-6xl font-bold tabular-nums leading-none"
           style={{ color: "#c9961a" }}
         >
           {String(value).padStart(2, "0")}
@@ -445,11 +445,11 @@ function ScoreboardRow({ match }: { match: ScheduleGame }) {
   const isUpcoming = match.result === "upcoming";
   return (
     <div
-      className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-white/[0.03]"
+      className="flex items-center gap-2 px-3 py-4 md:gap-4 md:px-5 transition-colors hover:bg-white/[0.03]"
       style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
     >
       <div
-        className="text-xs font-bold w-12 shrink-0"
+        className="text-xs font-bold w-9 md:w-12 shrink-0"
         style={{ color: "#6b7280", fontFamily: "'JetBrains Mono', monospace" }}
       >
         {match.week}
@@ -504,8 +504,8 @@ function ScoreboardRow({ match }: { match: ScheduleGame }) {
           </div>
         </div>
       </div>
-      <div className="text-right w-32 shrink-0">
-        <span className="text-xs" style={{ color: "#4b5563" }}>
+      <div className="text-right w-20 md:w-32 shrink-0">
+        <span className="text-xs leading-tight" style={{ color: "#4b5563" }}>
           {match.opponent}
         </span>
       </div>
@@ -783,13 +783,13 @@ export default function App() {
                   Draft Countdown
                 </span>
               </div>
-              <div className="flex justify-center gap-3 md:gap-6">
+              <div className="grid grid-cols-2 justify-items-center gap-5 md:flex md:justify-center md:gap-6">
                 <CountdownBlock value={countdown.days} label="Days" />
-                <div className="flex items-center text-3xl font-black pb-6" style={{ color: "rgba(201,150,26,0.4)", fontFamily: "'Barlow Condensed', sans-serif" }}>:</div>
+                <div className="hidden md:flex items-center text-3xl font-black pb-6" style={{ color: "rgba(201,150,26,0.4)", fontFamily: "'Barlow Condensed', sans-serif" }}>:</div>
                 <CountdownBlock value={countdown.hours} label="Hours" />
-                <div className="flex items-center text-3xl font-black pb-6" style={{ color: "rgba(201,150,26,0.4)", fontFamily: "'Barlow Condensed', sans-serif" }}>:</div>
+                <div className="hidden md:flex items-center text-3xl font-black pb-6" style={{ color: "rgba(201,150,26,0.4)", fontFamily: "'Barlow Condensed', sans-serif" }}>:</div>
                 <CountdownBlock value={countdown.minutes} label="Minutes" />
-                <div className="flex items-center text-3xl font-black pb-6" style={{ color: "rgba(201,150,26,0.4)", fontFamily: "'Barlow Condensed', sans-serif" }}>:</div>
+                <div className="hidden md:flex items-center text-3xl font-black pb-6" style={{ color: "rgba(201,150,26,0.4)", fontFamily: "'Barlow Condensed', sans-serif" }}>:</div>
                 <CountdownBlock value={countdown.seconds} label="Seconds" />
               </div>
               <div className="text-center mt-8">
@@ -988,7 +988,7 @@ export default function App() {
 
           {/* Season record */}
           <div
-            className="flex items-center gap-8 px-6 py-5 mb-6"
+            className="flex items-center gap-4 md:gap-8 px-4 md:px-6 py-5 mb-6"
             style={{
               background: "linear-gradient(135deg, #0e1118, #0a0e16)",
               border: "1px solid rgba(201,150,26,0.2)",
