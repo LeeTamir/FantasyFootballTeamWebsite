@@ -12,6 +12,7 @@ Responsibilities:
 from __future__ import annotations
 
 import json
+import math
 import os
 import time
 from datetime import datetime, timedelta, timezone
@@ -217,6 +218,198 @@ def box_scores(week: Optional[int] = None) -> list[dict]:
             }
         )
     return result
+
+
+# ── Fake "Vegas" odds (computed from projected points) ────────────────────
+# Std deviation of one team's weekly fantasy score; the margin between two
+# independent teams then has std = sqrt(2) * this (~37 pts).
+FANTASY_TEAM_STD = 26.0
+MARGIN_STD = FANTASY_TEAM_STD * math.sqrt(2)
+# Overround (house "vig") folded into the moneyline. ~0.05 prices a true
+# pick'em at about -110 / -110, like a real sportsbook.
+ODDS_OVERROUND = 0.05
+
+STARTER_EXCLUDED_SLOTS = {"BE", "BENCH", "IR"}
+
+
+def _is_starter(slot: str) -> bool:
+    return (slot or "").upper() not in STARTER_EXCLUDED_SLOTS
+
+
+def _round_half(x: float) -> float:
+    return round(x * 2) / 2
+
+
+def _normal_cdf(x: float) -> float:
+    return 0.5 * (1 + math.erf(x / math.sqrt(2)))
+
+
+def _american_ml(prob: float) -> int:
+    """American moneyline from an implied probability, rounded to a book-like 5."""
+    prob = min(max(prob, 0.01), 0.99)
+    ml = -100 * prob / (1 - prob) if prob >= 0.5 else 100 * (1 - prob) / prob
+    return int(round(ml / 5.0) * 5)
+
+
+def compute_odds(proj_me: float, proj_opp: float, me_abbrev: str, opp_abbrev: str) -> dict:
+    """Spread / total / moneyline derived from the two projected team totals."""
+    margin = proj_me - proj_opp  # positive => I'm favored
+    total = _round_half(proj_me + proj_opp)
+    spread = _round_half(abs(margin))
+
+    p_me = _normal_cdf(margin / MARGIN_STD) if MARGIN_STD else (1.0 if margin > 0 else 0.0)
+    p_opp = 1 - p_me
+    q_me = p_me * (1 + ODDS_OVERROUND)   # juiced implied probabilities
+    q_opp = p_opp * (1 + ODDS_OVERROUND)
+
+    me_favored = margin >= 0
+    return {
+        "projected": {"me": round(proj_me, 1), "opp": round(proj_opp, 1)},
+        "spread": {
+            "favorite": me_abbrev if me_favored else opp_abbrev,
+            "me": (-spread if me_favored else spread) or 0,
+            "opp": (spread if me_favored else -spread) or 0,
+        },
+        "total": total,
+        "moneyline": {"me": _american_ml(q_me), "opp": _american_ml(q_opp)},
+        "winProb": {"me": round(p_me, 3), "opp": round(p_opp, 3)},
+    }
+
+
+def _game_status(p) -> tuple[str, Optional[float]]:
+    """Map a player's game progress to scheduled / live / final."""
+    gp = getattr(p, "game_played", None)  # 0..100 (% of game elapsed)
+    if gp is None:
+        return "scheduled", None
+    if gp >= 100:
+        return "final", gp
+    if gp > 0:
+        return "live", gp
+    return "scheduled", gp
+
+
+def _matchup_player(p) -> dict:
+    status, gp = _game_status(p)
+    return {
+        "name": getattr(p, "name", ""),
+        "slot": getattr(p, "slot_position", ""),
+        "position": getattr(p, "position", ""),
+        "proTeam": getattr(p, "proTeam", ""),
+        "proOpponent": getattr(p, "pro_opponent", ""),
+        "projected": round(getattr(p, "projected_points", 0) or 0, 1),
+        "points": round(getattr(p, "points", 0) or 0, 1),
+        "gameStatus": status,
+        "gamePlayed": gp,
+    }
+
+
+def _team_side(team, lineup) -> dict:
+    starters = [p for p in lineup if _is_starter(getattr(p, "slot_position", ""))]
+    proj = sum((getattr(p, "projected_points", 0) or 0) for p in starters)
+    return {
+        "teamName": getattr(team, "team_name", "Bye") if team else "Bye",
+        "teamAbbrev": getattr(team, "team_abbrev", "") if team else "",
+        "projected": round(proj, 1),
+        "starters": [_matchup_player(p) for p in starters],
+    }
+
+
+def _demo_matchup(week: Optional[int]) -> dict:
+    """Sample box score + odds for previewing the UI before the season starts.
+    Enabled by setting DEMO_MATCHUP=1; short-circuits real ESPN data. The opponent
+    projection is varied per week so the odds show a range (favorite / dog / pick'em)."""
+    def pl(name, slot, pos, team, opp, proj, pts, status, gp):
+        return {"name": name, "slot": slot, "position": pos, "proTeam": team,
+                "proOpponent": opp, "projected": proj, "points": pts,
+                "gameStatus": status, "gamePlayed": gp}
+    seed = week or 1
+    me_proj = 121.4
+    opp_proj = round(108 + ((seed * 7) % 31), 1)  # deterministic weekly variety
+    me = {
+        "teamName": TEAM_NAME or "Lee's Team", "teamAbbrev": "LT",
+        "projected": me_proj, "points": 78.6,
+        "starters": [
+            pl("Patrick Mahomes", "QB", "QB", "KC", "vs DEN", 22.5, 24.8, "final", 100),
+            pl("Bijan Robinson", "RB", "RB", "ATL", "@ CAR", 19.2, 12.4, "live", 55),
+            pl("Saquon Barkley", "RB", "RB", "PHI", "vs DAL", 17.8, 0, "scheduled", 0),
+            pl("Justin Jefferson", "WR", "WR", "MIN", "@ GB", 16.4, 21.0, "final", 100),
+            pl("CeeDee Lamb", "WR", "WR", "DAL", "@ PHI", 15.1, 8.3, "live", 40),
+            pl("Trey McBride", "TE", "TE", "ARI", "vs SF", 11.2, 12.1, "final", 100),
+            pl("Jahmyr Gibbs", "FLEX", "RB", "DET", "vs CHI", 14.0, 0, "scheduled", 0),
+            pl("Harrison Butker", "K", "K", "KC", "vs DEN", 8.5, 9.0, "final", 100),
+            pl("Ravens D/ST", "D/ST", "D/ST", "BAL", "@ CIN", 7.0, -1.0, "live", 30),
+        ],
+    }
+    opp = {
+        "teamName": "Rivals FC", "teamAbbrev": "RIV",
+        "projected": opp_proj, "points": 71.2,
+        "starters": [
+            pl("Josh Allen", "QB", "QB", "BUF", "vs NYJ", 23.1, 20.4, "final", 100),
+            pl("Christian McCaffrey", "RB", "RB", "SF", "@ ARI", 20.0, 6.5, "live", 45),
+            pl("De'Von Achane", "RB", "RB", "MIA", "vs LAR", 15.6, 18.9, "final", 100),
+            pl("Tyreek Hill", "WR", "WR", "MIA", "vs LAR", 16.2, 11.0, "final", 100),
+            pl("Amon-Ra St. Brown", "WR", "WR", "DET", "vs CHI", 14.3, 0, "scheduled", 0),
+            pl("Sam LaPorta", "TE", "TE", "DET", "vs CHI", 10.1, 0, "scheduled", 0),
+            pl("Kyren Williams", "FLEX", "RB", "LAR", "@ MIA", 13.4, 7.9, "live", 45),
+            pl("Jake Elliott", "K", "K", "PHI", "vs DAL", 8.1, 0, "scheduled", 0),
+            pl("Bills D/ST", "D/ST", "D/ST", "BUF", "vs NYJ", 6.8, 6.0, "final", 100),
+        ],
+    }
+    return {
+        "week": seed, "status": "live", "me": me, "opp": opp,
+        "odds": compute_odds(me_proj, opp_proj, "LT", "RIV"),
+    }
+
+
+def matchup(week: Optional[int] = None) -> dict:
+    """My team's matchup for a week: both starting lineups, totals, and odds."""
+    if os.getenv("DEMO_MATCHUP"):
+        return _demo_matchup(week)
+
+    league = get_league()
+    me = _find_my_team(league)
+    if me is None:
+        return {}
+
+    boxes = league.box_scores(week) if week else league.box_scores()
+    my_id = me.team_id
+    box = i_am_home = None
+    for b in boxes:
+        if getattr(b.home_team, "team_id", None) == my_id:
+            box, i_am_home = b, True
+            break
+        if getattr(b.away_team, "team_id", None) == my_id:
+            box, i_am_home = b, False
+            break
+    if box is None:
+        return {}
+
+    my_side = _team_side(box.home_team if i_am_home else box.away_team,
+                         box.home_lineup if i_am_home else box.away_lineup)
+    opp_side = _team_side(box.away_team if i_am_home else box.home_team,
+                          box.away_lineup if i_am_home else box.home_lineup)
+    my_side["points"] = round((box.home_score if i_am_home else box.away_score), 1)
+    opp_side["points"] = round((box.away_score if i_am_home else box.home_score), 1)
+
+    odds = compute_odds(my_side["projected"], opp_side["projected"],
+                        my_side["teamAbbrev"] or "LT", opp_side["teamAbbrev"] or "OPP")
+
+    progress = [pl["gamePlayed"] for pl in my_side["starters"] + opp_side["starters"]
+                if pl["gamePlayed"] is not None]
+    if progress and all(gp >= 100 for gp in progress):
+        status = "final"
+    elif any((gp or 0) > 0 for gp in progress):
+        status = "live"
+    else:
+        status = "upcoming"
+
+    return {
+        "week": week or getattr(league, "current_week", None),
+        "status": status,
+        "me": my_side,
+        "opp": opp_side,
+        "odds": odds,
+    }
 
 
 def roster() -> list[dict]:

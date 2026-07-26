@@ -77,6 +77,12 @@ def scoreboard(week: int | None = Query(default=None, ge=1, le=18)):
     return _guard(espn.box_scores, week)
 
 
+@app.get("/api/matchup")
+def matchup(week: int | None = Query(default=None, ge=1, le=18)):
+    """My weekly matchup: both starting lineups, projected/live totals, and odds."""
+    return _guard(espn.matchup, week)
+
+
 @app.get("/api/roster")
 def roster():
     return _guard(espn.roster)

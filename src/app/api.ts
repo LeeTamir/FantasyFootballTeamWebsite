@@ -44,6 +44,44 @@ export type NewsItem = {
   hot: boolean;
 };
 
+export type GameStatus = "scheduled" | "live" | "final";
+
+export type MatchupPlayer = {
+  name: string;
+  slot: string;
+  position: string;
+  proTeam: string;
+  proOpponent: string;
+  projected: number;
+  points: number;
+  gameStatus: GameStatus;
+  gamePlayed: number | null;
+};
+
+export type MatchupTeam = {
+  teamName: string;
+  teamAbbrev: string;
+  projected: number;
+  points: number;
+  starters: MatchupPlayer[];
+};
+
+export type Odds = {
+  projected: { me: number; opp: number };
+  spread: { favorite: string; me: number; opp: number };
+  total: number;
+  moneyline: { me: number; opp: number };
+  winProb: { me: number; opp: number };
+};
+
+export type Matchup = {
+  week: number | null;
+  status: "upcoming" | "live" | "final";
+  me: MatchupTeam;
+  opp: MatchupTeam;
+  odds: Odds;
+};
+
 async function getJSON<T>(path: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, { signal });
   if (!res.ok) {
@@ -58,4 +96,6 @@ export const api = {
   schedule: (signal?: AbortSignal) =>
     getJSON<ScheduleGame[]>("/api/schedule", signal),
   news: (signal?: AbortSignal) => getJSON<NewsItem[]>("/api/news", signal),
+  matchup: (week: number, signal?: AbortSignal) =>
+    getJSON<Matchup>(`/api/matchup?week=${week}`, signal),
 };

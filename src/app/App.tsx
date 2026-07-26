@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { Clock, Users, Newspaper, BarChart3, ChevronRight, Flame, Info, Menu, X, Trophy, ExternalLink } from "lucide-react";
+import { Clock, Users, Newspaper, BarChart3, ChevronRight, ChevronLeft, ChevronDown, Flame, Info, Menu, X, Trophy, ExternalLink } from "lucide-react";
 import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
-import { api, type TeamSummary, type ScheduleGame, type NewsItem } from "@/app/api";
+import { api, type TeamSummary, type ScheduleGame, type NewsItem, type Matchup, type MatchupTeam, type MatchupPlayer, type Odds } from "@/app/api";
 import teamLogo from "@/imports/ChatGPT_Image_Jul_14__2026__10_11_10_PM.png";
 import playerImg1 from "@/imports/Screenshot_2026-07-25_at_2.14.50_PM.png";
 import playerImg2 from "@/imports/Screenshot_2026-07-25_at_2.15.36_PM.png";
@@ -339,14 +339,14 @@ function CountdownBlock({ value, label }: { value: number; label: string }) {
 }
 
 const posColors: Record<string, string> = {
-  QB: "#3b82f6",
-  RB: "#22c55e",
-  WR: "#a855f7",
-  TE: "#f97316",
-  K: "#ec4899",
-  DEF: "#6b7280",
-  FLEX: "#14b8a6",
-  BN: "#374151",
+  QB: "#ff4d94",   // bright pink (brighter than the old kicker pink)
+  RB: "#f97316",   // orange (the old tight-end color)
+  WR: "#60a5fa",   // lighter blue (than the old quarterback blue)
+  TE: "#14b8a6",   // teal (the old flex color)
+  K: "#c084fc",    // lighter purple (than the old wide-receiver purple)
+  DEF: "#facc15",  // highlighter yellow (D/ST)
+  FLEX: "#818cf8", // new distinct indigo (placeholder until a player fills it)
+  BN: "#374151",   // bench — unchanged
 };
 
 
@@ -457,12 +457,15 @@ function NewsCard({ item }: { item: NewsItem }) {
   );
 }
 
-function ScoreboardRow({ match }: { match: ScheduleGame }) {
+function ScoreboardRow({ match, onOpen }: { match: ScheduleGame; onOpen: () => void }) {
   const isUpcoming = match.result === "upcoming";
   return (
     <div
-      className="flex items-center gap-2 px-3 py-4 md:gap-4 md:px-5 transition-colors hover:bg-white/[0.03]"
-      style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } }}
+      className="group flex items-center gap-2 px-3 py-4 md:gap-4 md:px-5 cursor-pointer transition-colors hover:bg-white/[0.03]"
     >
       <div
         className="text-xs font-bold w-9 md:w-12 shrink-0"
@@ -525,6 +528,7 @@ function ScoreboardRow({ match }: { match: ScheduleGame }) {
           {match.opponent}
         </span>
       </div>
+      <ChevronRight size={16} className="shrink-0 opacity-25 group-hover:opacity-70 transition-opacity" style={{ color: "#c9961a" }} />
     </div>
   );
 }
@@ -571,6 +575,269 @@ function Ticker({ items }: { items: { text: string; lead?: boolean }[] }) {
   );
 }
 
+// ── Week box-score detail (Scoreboard → click a week) ──────────────────────
+function slotColor(slot: string): string {
+  const s = (slot || "").toUpperCase();
+  if (s.includes("QB")) return posColors.QB;
+  if (s.includes("RB")) return posColors.RB;
+  if (s.includes("WR")) return posColors.WR;
+  if (s.includes("TE")) return posColors.TE;
+  if (s.includes("FLEX")) return posColors.FLEX;
+  if (s.includes("D/ST") || s.includes("DEF")) return posColors.DEF;
+  if (s.includes("K")) return posColors.K;
+  return "#6b7280";
+}
+
+const fmtSigned = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+
+function StatusBadge({ status }: { status: "upcoming" | "live" | "final" }) {
+  const map = {
+    upcoming: { label: "UPCOMING", color: "#c9961a", bg: "rgba(201,150,26,0.12)" },
+    live: { label: "LIVE", color: "#22c55e", bg: "rgba(34,197,94,0.12)" },
+    final: { label: "FINAL", color: "#9ca3af", bg: "rgba(156,163,175,0.12)" },
+  } as const;
+  const s = map[status];
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 text-xs font-bold px-2 py-0.5 uppercase"
+      style={{ background: s.bg, color: s.color, fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: "0.1em" }}
+    >
+      {status === "live" && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: s.color }} />}
+      {s.label}
+    </span>
+  );
+}
+
+function PlayerRow({ p }: { p: MatchupPlayer }) {
+  const color = slotColor(p.slot);
+  const live = p.gameStatus === "live";
+  const done = p.gameStatus === "final";
+  const ptsColor = live ? "#22c55e" : done ? "#e8eaf0" : "#4b5563";
+  return (
+    <div className="flex items-center gap-2 py-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+      <span
+        className="text-xs font-black w-10 shrink-0 text-center px-1 py-0.5 uppercase"
+        style={{ color, background: color + "1a", border: `1px solid ${color}40`, fontFamily: "'Barlow Condensed', sans-serif" }}
+      >
+        {p.slot}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-semibold truncate" style={{ color: "#e8eaf0" }}>{p.name || "Empty"}</div>
+        <div className="text-xs truncate" style={{ color: "#4b5563" }}>
+          {[p.proTeam, p.proOpponent].filter(Boolean).join(" · ")}
+        </div>
+      </div>
+      <div className="text-right shrink-0 w-11">
+        <div className="text-xs tabular-nums" style={{ color: "#6b7280", fontFamily: "'JetBrains Mono', monospace" }}>{p.projected.toFixed(1)}</div>
+        <div className="text-[10px] uppercase tracking-wide" style={{ color: "#374151" }}>proj</div>
+      </div>
+      <div className="text-right shrink-0 w-14">
+        <div className="text-base font-black tabular-nums flex items-center justify-end gap-1" style={{ color: ptsColor, fontFamily: "'Barlow Condensed', sans-serif" }}>
+          {live && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#22c55e" }} />}
+          {p.gameStatus === "scheduled" ? "—" : p.points.toFixed(1)}
+        </div>
+        <div className="text-[10px] uppercase tracking-wide" style={{ color: "#374151" }}>pts</div>
+      </div>
+    </div>
+  );
+}
+
+function LineupSide({ team, isMe }: { team: MatchupTeam; isMe: boolean }) {
+  return (
+    <div style={{ background: "linear-gradient(160deg, #0e1118, #0a0e16)", border: `1px solid ${isMe ? "rgba(201,150,26,0.25)" : "rgba(255,255,255,0.07)"}` }}>
+      <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="min-w-0">
+          <div className="text-sm font-black uppercase truncate" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: isMe ? "#c9961a" : "#e8eaf0", letterSpacing: "0.05em" }}>{team.teamName}</div>
+          <div className="text-xs" style={{ color: "#4b5563" }}>Proj {team.projected.toFixed(1)}</div>
+        </div>
+        <div className="text-3xl font-black tabular-nums shrink-0 ml-3" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: "#e8eaf0" }}>{team.points.toFixed(1)}</div>
+      </div>
+      <div className="px-4">
+        {team.starters.length ? (
+          team.starters.map((p, i) => <PlayerRow key={i} p={p} />)
+        ) : (
+          <p className="text-center text-xs py-6" style={{ color: "#4b5563" }}>Lineup not set yet.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Sportsbook-style odds grid: two team rows × Spread / Money / Total, each a
+// boxed cell showing the line (white) over the juice (gold).
+function OddsBreakdown({ odds, meAbbrev, oppAbbrev }: { odds: Odds; meAbbrev: string; oppAbbrev: string }) {
+  const pick = odds.spread.me === 0;
+  const meWin = Math.round(odds.winProb.me * 100);
+  const oppWin = 100 - meWin;
+
+  // Spread/total juice is cosmetic (a spread is ~50/50, so ~-110 a side). We
+  // shade it slightly so the favorite lays a touch less, like a real book.
+  const favWin = Math.max(odds.winProb.me, odds.winProb.opp);
+  const shade = Math.round((favWin - 0.5) * 30);
+  const meFav = odds.spread.me <= 0;
+  const meSpreadJ = meFav ? -110 + shade : -110 - shade;
+  const oppSpreadJ = meFav ? -110 - shade : -110 + shade;
+
+  const StatBox = ({ line, sub }: { line: string; sub?: string }) => (
+    <div
+      className="flex flex-col items-center justify-center py-1.5 px-1 rounded"
+      style={{ border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.02)" }}
+    >
+      <span className="text-sm font-black leading-tight tabular-nums" style={{ color: "#e8eaf0", fontFamily: "'Barlow Condensed', sans-serif" }}>{line}</span>
+      {sub && <span className="text-[11px] leading-tight tabular-nums" style={{ color: "#c9961a", fontFamily: "'JetBrains Mono', monospace" }}>{sub}</span>}
+    </div>
+  );
+
+  const Row = ({ abbr, isMe, spreadLn, spreadJ, ml, totLn }:
+    { abbr: string; isMe: boolean; spreadLn: string; spreadJ: number; ml: number; totLn: string }) => (
+    <div className="grid gap-1.5 items-stretch" style={{ gridTemplateColumns: "2.75rem 1fr 1fr 1fr" }}>
+      <span className="flex items-center text-sm font-black uppercase" style={{ color: isMe ? "#c9961a" : "#e8eaf0", fontFamily: "'Barlow Condensed', sans-serif" }}>{abbr}</span>
+      <StatBox line={spreadLn} sub={fmtSigned(spreadJ)} />
+      <StatBox line={fmtSigned(ml)} />
+      <StatBox line={totLn} sub={fmtSigned(isMe ? -112 : -108)} />
+    </div>
+  );
+
+  return (
+    <div className="px-3 md:px-4 pb-4 pt-1">
+      <div className="grid gap-1.5 mb-1.5" style={{ gridTemplateColumns: "2.75rem 1fr 1fr 1fr" }}>
+        <span />
+        {["Spread", "Money", "Total"].map((h) => (
+          <span key={h} className="text-center text-[11px] uppercase tracking-widest" style={{ color: "#6b7280", fontFamily: "'Barlow Condensed', sans-serif" }}>{h}</span>
+        ))}
+      </div>
+      <div className="space-y-1.5">
+        <Row abbr={meAbbrev} isMe spreadLn={pick ? "PK" : fmtSigned(odds.spread.me)} spreadJ={meSpreadJ} ml={odds.moneyline.me} totLn={`O ${odds.total}`} />
+        <Row abbr={oppAbbrev} isMe={false} spreadLn={pick ? "PK" : fmtSigned(odds.spread.opp)} spreadJ={oppSpreadJ} ml={odds.moneyline.opp} totLn={`U ${odds.total}`} />
+      </div>
+      <div className="mt-3">
+        <div className="flex justify-between text-[11px] mb-1" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+          <span style={{ color: "#c9961a" }}>{meAbbrev} {meWin}%</span>
+          <span style={{ color: "#6b7280" }}>{oppWin}% {oppAbbrev}</span>
+        </div>
+        <div className="flex h-1 overflow-hidden rounded" style={{ background: "rgba(255,255,255,0.06)" }}>
+          <div style={{ width: `${meWin}%`, background: "#c9961a" }} />
+          <div style={{ width: `${oppWin}%`, background: "#374151" }} />
+        </div>
+      </div>
+      <p className="text-center text-[10px] mt-3" style={{ color: "#374151", fontFamily: "'JetBrains Mono', monospace" }}>
+        For entertainment · computed from projections
+      </p>
+    </div>
+  );
+}
+
+// The current week's odds bar, shown inside that week's card on the Scoreboard.
+// Fetches on mount (only one is rendered) and refreshes every 60s.
+function WeekOddsDropdown({ weekNum }: { weekNum: number }) {
+  const [open, setOpen] = useState(false);
+  const [odds, setOdds] = useState<Odds | null>(null);
+  const [abbrevs, setAbbrevs] = useState<{ me: string; opp: string }>({ me: "LT", opp: "OPP" });
+  const [state, setState] = useState<"loading" | "ready" | "empty">("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = () =>
+      api.matchup(weekNum)
+        .then((m) => {
+          if (cancelled) return;
+          if (m && m.odds && m.me) {
+            setOdds(m.odds);
+            setAbbrevs({ me: m.me.teamAbbrev || "LT", opp: m.opp.teamAbbrev || "OPP" });
+            setState("ready");
+          } else {
+            setState("empty");
+          }
+        })
+        .catch(() => { if (!cancelled) setState("empty"); });
+    load();
+    const id = setInterval(load, 60_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [weekNum]);
+
+  return (
+    <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", background: "rgba(201,150,26,0.035)" }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="group w-full flex items-center gap-2 px-3 md:px-5 py-2.5 text-left"
+        style={{ background: "none", cursor: "pointer", border: "none" }}
+      >
+        <span className="text-[11px] font-black uppercase" style={{ color: "#c9961a", fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: "0.18em" }}>Game Odds</span>
+        <div className="ml-auto flex items-center gap-1.5">
+          {state === "loading" && (
+            <span className="text-xs" style={{ color: "#4b5563", fontFamily: "'JetBrains Mono', monospace" }}>…</span>
+          )}
+          <ChevronDown
+            size={15}
+            className={`transition-transform duration-200 group-hover:scale-150 ${open ? "rotate-180" : ""}`}
+            style={{ color: "#c9961a" }}
+          />
+        </div>
+      </button>
+      {open &&
+        (state === "ready" && odds ? (
+          <OddsBreakdown odds={odds} meAbbrev={abbrevs.me} oppAbbrev={abbrevs.opp} />
+        ) : (
+          <p className="text-center text-xs px-4 pb-3" style={{ color: "#4b5563" }}>
+            {state === "loading" ? "Loading odds…" : "Odds appear once this week's projections are set."}
+          </p>
+        ))}
+    </div>
+  );
+}
+
+function WeekDetailView({ week, matchup, loading, onBack }: { week: number; matchup: Matchup | null; loading: boolean; onBack: () => void }) {
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <button
+        onClick={onBack}
+        className="flex items-center gap-1.5 mb-6 text-xs font-bold uppercase"
+        style={{ color: "#9ca3af", background: "none", cursor: "pointer", border: "none", fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: "0.15em" }}
+      >
+        <ChevronLeft size={14} /> Back to schedule
+      </button>
+      <div className="text-xs font-bold tracking-widest uppercase mb-4" style={{ color: "#c9961a", fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: "0.3em" }}>
+        Week {week} · Box Score
+      </div>
+
+      {loading && !matchup ? (
+        <p className="text-sm py-10 text-center" style={{ color: "#6b7280" }}>Loading box score…</p>
+      ) : !matchup ? (
+        <div className="mt-2 p-6 text-center flex items-center gap-3 justify-center" style={{ background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.15)" }}>
+          <Info size={16} style={{ color: "#60a5fa" }} />
+          <p className="text-xs text-left" style={{ color: "#9ca3af" }}>
+            This week's box score isn't available yet — lineups and live scoring appear once the season is underway.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between gap-3 mb-5">
+            <div className="text-center flex-1 min-w-0">
+              <div className="text-sm font-black uppercase truncate" style={{ color: "#c9961a", fontFamily: "'Barlow Condensed', sans-serif" }}>{matchup.me.teamAbbrev}</div>
+              <div className="text-4xl md:text-5xl font-black tabular-nums leading-none" style={{ color: "#e8eaf0", fontFamily: "'Barlow Condensed', sans-serif" }}>{matchup.me.points.toFixed(1)}</div>
+              <div className="text-xs mt-1" style={{ color: "#4b5563" }}>proj {matchup.me.projected.toFixed(1)}</div>
+            </div>
+            <div className="flex flex-col items-center gap-1 shrink-0">
+              <StatusBadge status={matchup.status} />
+              <span className="text-xs" style={{ color: "#4b5563", fontFamily: "'Barlow Condensed', sans-serif" }}>vs</span>
+            </div>
+            <div className="text-center flex-1 min-w-0">
+              <div className="text-sm font-black uppercase truncate" style={{ color: "#e8eaf0", fontFamily: "'Barlow Condensed', sans-serif" }}>{matchup.opp.teamAbbrev}</div>
+              <div className="text-4xl md:text-5xl font-black tabular-nums leading-none" style={{ color: "#e8eaf0", fontFamily: "'Barlow Condensed', sans-serif" }}>{matchup.opp.points.toFixed(1)}</div>
+              <div className="text-xs mt-1" style={{ color: "#4b5563" }}>proj {matchup.opp.projected.toFixed(1)}</div>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <LineupSide team={matchup.me} isMe />
+            <LineupSide team={matchup.opp} isMe={false} />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 type NavSection = "home" | "roster" | "news" | "scoreboard";
 
 export default function App() {
@@ -584,6 +851,11 @@ export default function App() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [isLive, setIsLive] = useState(false);
   const [newsFilter, setNewsFilter] = useState<"ALL" | "NEWS" | "RUMOR" | "INJURY">("ALL");
+
+  // Week box-score detail (Scoreboard → click a week).
+  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
+  const [matchup, setMatchup] = useState<Matchup | null>(null);
+  const [matchupLoading, setMatchupLoading] = useState(false);
 
   // Fetch live data on mount, then refresh every 60s so scores and news stay
   // current during games, plus an immediate refresh whenever the tab regains
@@ -606,12 +878,45 @@ export default function App() {
     };
   }, []);
 
+  // When a week is open, fetch its box score and keep it live (60s) too.
+  useEffect(() => {
+    if (selectedWeek == null) return;
+    let cancelled = false;
+    setMatchup(null);
+    setMatchupLoading(true);
+    const load = () => {
+      api.matchup(selectedWeek)
+        .then((m) => { if (!cancelled) setMatchup(m && m.me ? m : null); })
+        .catch(() => { if (!cancelled) setMatchup(null); })
+        .finally(() => { if (!cancelled) setMatchupLoading(false); });
+    };
+    load();
+    const id = setInterval(load, 60_000);
+    const onVisible = () => { if (document.visibilityState === "visible") load(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [selectedWeek]);
+
+  // Navigating to any section closes an open box score, so tapping "Scoreboard"
+  // in the nav always returns to the schedule list (not the last week viewed).
+  useEffect(() => {
+    setSelectedWeek(null);
+  }, [activeSection]);
+
   // Always land at the top of a section when switching (nav bar or home cards).
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
-  }, [activeSection]);
+  }, [activeSection, selectedWeek]);
 
   const filteredNews = newsFilter === "ALL" ? news : news.filter((n) => n.tag === newsFilter);
+
+  // Odds only show for the current week — the first still-"upcoming" matchup.
+  // As each week finalizes (W/L posts), this advances to the next week.
+  const activeOddsWeek = schedule.find((g) => g.result === "upcoming")?.weekNum ?? null;
 
   const nav: { id: NavSection; label: string; icon: React.ReactNode }[] = [
     { id: "home", label: "Home", icon: <Trophy size={14} /> },
@@ -981,7 +1286,14 @@ export default function App() {
       )}
 
       {/* ── SCOREBOARD ── */}
-      {activeSection === "scoreboard" && (
+      {activeSection === "scoreboard" && (selectedWeek != null ? (
+        <WeekDetailView
+          week={selectedWeek}
+          matchup={matchup}
+          loading={matchupLoading}
+          onBack={() => setSelectedWeek(null)}
+        />
+      ) : (
         <div className="max-w-3xl mx-auto px-4 py-12">
           <div className="mb-10">
             <div
@@ -1064,30 +1376,34 @@ export default function App() {
           </div>
 
           {/* Matchups */}
-          <div
-            style={{
-              background: "#0e1118",
-              border: "1px solid rgba(255,255,255,0.07)",
-            }}
-          >
-            <div
-              className="px-5 py-3 flex items-center gap-2"
-              style={{
-                borderBottom: "1px solid rgba(255,255,255,0.07)",
-                background: "rgba(201,150,26,0.04)",
-              }}
+          <div className="flex items-center gap-2 mb-3">
+            <BarChart3 size={13} style={{ color: "#c9961a" }} />
+            <span
+              className="text-xs font-bold uppercase tracking-widest"
+              style={{ color: "#c9961a", fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: "0.2em" }}
             >
-              <BarChart3 size={13} style={{ color: "#c9961a" }} />
-              <span
-                className="text-xs font-bold uppercase tracking-widest"
-                style={{ color: "#c9961a", fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: "0.2em" }}
-              >
-                Season Schedule
-              </span>
-            </div>
-            {schedule.map((match, i) => (
-              <ScoreboardRow key={i} match={match} />
-            ))}
+              Season Schedule
+            </span>
+          </div>
+          <div className="space-y-3">
+            {schedule.map((match, i) => {
+              const showOdds = match.weekNum === activeOddsWeek;
+              return (
+                <div
+                  key={i}
+                  className="overflow-hidden rounded-md"
+                  style={{
+                    background: "#0e1118",
+                    border: showOdds
+                      ? "1px solid rgba(201,150,26,0.35)"
+                      : "1px solid rgba(255,255,255,0.08)",
+                  }}
+                >
+                  <ScoreboardRow match={match} onOpen={() => setSelectedWeek(match.weekNum)} />
+                  {showOdds && <WeekOddsDropdown weekNum={match.weekNum} />}
+                </div>
+              );
+            })}
           </div>
 
           <div
@@ -1105,7 +1421,7 @@ export default function App() {
             </p>
           </div>
         </div>
-      )}
+      ))}
 
       {/* Footer */}
       <footer
