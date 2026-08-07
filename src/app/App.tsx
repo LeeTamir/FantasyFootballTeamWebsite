@@ -11,12 +11,12 @@ import playerImg4 from "@/imports/Screenshot_2026-07-25_at_2.16.45_PM.png";
 const TEAM_NAME = "Lee's Team";
 const TEAM_ABBR = "LT";
 const SEASON = "2026";
-const DRAFT_DATE = new Date("2026-08-07T18:00:00-05:00");
+const DRAFT_DATE = new Date("2026-08-08T12:00:00-04:00");
 
 // Scrolling headline ticker at the very top of the page.
 // Add your own items here anytime — the first item is the bold "lead".
 const TICKER_ITEMS: { text: string; lead?: boolean }[] = [
-  { text: "⚡ DRAFT DAY APPROACHING — AUG 7, 2026 · 6:00 PM EST", lead: true },
+  { text: "⚡ DRAFT DAY APPROACHING — SATURDAY, AUG 8, 2026 · 12:00 PM EST", lead: true },
 ];
 
 // Noun used in the "No … right now." empty state per news filter.
@@ -298,7 +298,7 @@ function RosterPlayerSection({ slot, index }: { slot: RosterSlot; index: number 
             className="text-xs font-bold uppercase tracking-widest"
             style={{ color: "#4b5563", fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: "0.2em" }}
           >
-            Filling · Aug 7, 2026
+            Filling · Aug 8, 2026
           </span>
         </div>
       </div>
@@ -1115,7 +1115,7 @@ export default function App() {
               </div>
               <div className="text-center mt-8">
                 <p className="text-sm" style={{ color: "#6b7280" }}>
-                  Draft night · August 7, 2026 · 6:00 PM EST
+                  Draft day · Saturday, August 8, 2026 · 12:00 PM EST
                 </p>
               </div>
             </div>
@@ -1188,7 +1188,7 @@ export default function App() {
               </h2>
               <div className="h-0.5 w-24 mx-auto mt-5" style={{ background: "linear-gradient(90deg, transparent, #c9961a, transparent)" }} />
               <p className="mt-5 max-w-md mx-auto text-sm leading-relaxed" style={{ color: "#6b7280" }}>
-                16 roster spots. 1 draft. Every position below is a declaration of intent — check back August 7th to see who fills the jersey.
+                16 roster spots. 1 draft. Every position below is a declaration of intent — check back August 8th to see who fills the jersey.
               </p>
             </div>
           </div>
@@ -1207,7 +1207,7 @@ export default function App() {
               className="text-xs font-bold tracking-widest uppercase"
               style={{ color: "#c9961a", fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: "0.3em" }}
             >
-              16 Positions · Draft Night Aug 7
+              16 Positions · Draft Day Aug 8
             </div>
             <p className="text-xs text-center max-w-xs" style={{ color: "#374151" }}>
               Roster will be updated live following the draft
