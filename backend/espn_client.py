@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -200,7 +201,7 @@ def _box_player(p) -> dict:
 def box_scores(week: Optional[int] = None) -> list[dict]:
     """Every matchup for a week, with per-player lineups."""
     league = get_league()
-    boxes = league.box_scores(week) if week else league.box_scores()
+    boxes = _box_scores_for_week(league, week)
     result = []
     for b in boxes:
         home = b.home_team
@@ -405,6 +406,29 @@ def _demo_matchup(week: Optional[int]) -> dict:
     }
 
 
+_box_lock = threading.Lock()
+
+
+def _box_scores_for_week(league, week: Optional[int]):
+    """league.box_scores(week) ignores any week greater than the current week
+    (it falls back to the current week), so future weeks return today's
+    projections. Temporarily raise current_week so the library actually fetches
+    the requested week's projections, then restore it.
+
+    Guarded by a lock because it mutates shared state on the cached league —
+    concurrent calls must not observe or clobber the temporary value."""
+    with _box_lock:
+        if not week:
+            return league.box_scores()
+        saved = league.current_week
+        try:
+            if week > saved:
+                league.current_week = week
+            return league.box_scores(week)
+        finally:
+            league.current_week = saved
+
+
 def matchup(week: Optional[int] = None) -> dict:
     """My team's matchup for a week: both starting lineups, totals, and odds."""
     if os.getenv("DEMO_MATCHUP"):
@@ -415,7 +439,7 @@ def matchup(week: Optional[int] = None) -> dict:
     if me is None:
         return {}
 
-    boxes = league.box_scores(week) if week else league.box_scores()
+    boxes = _box_scores_for_week(league, week)
     my_id = me.team_id
     box = i_am_home = None
     for b in boxes:

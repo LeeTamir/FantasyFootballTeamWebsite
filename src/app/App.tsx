@@ -733,7 +733,7 @@ function OddsBreakdown({ odds, meAbbrev, oppAbbrev }: { odds: Odds; meAbbrev: st
 // The current week's odds bar, shown inside that week's card on the Scoreboard.
 // Fetches on mount (only one is rendered) and refreshes every 60s.
 function WeekOddsDropdown({ weekNum }: { weekNum: number }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true); // open by default
   const [odds, setOdds] = useState<Odds | null>(null);
   const [abbrevs, setAbbrevs] = useState<{ me: string; opp: string }>({ me: "LT", opp: "OPP" });
   const [state, setState] = useState<"loading" | "ready" | "empty">("loading");
