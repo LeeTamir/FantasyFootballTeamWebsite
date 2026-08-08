@@ -580,11 +580,12 @@ def roster_news(limit_players: Optional[int] = None) -> list[dict]:
                     continue
                 seen_headlines.add(headline)
 
-                # summary = short preview; body = the full article text.
+                # summary = short preview; body = the article text, truncated
+                # (the card links out to the full story on ESPN anyway).
                 description = _strip_html(entry.get("description") or "")
                 story = _strip_html(entry.get("story") or "")
                 summary = (description or story)[:280]
-                body = story or description or summary
+                body = _truncate(story or description or summary, ESPN_BODY_LIMIT)
                 published = entry.get("published", "")
                 rel = _relative_time(published)
 
@@ -663,6 +664,23 @@ def _strip_html(text: str) -> str:
     import re
 
     return re.sub(r"<[^>]+>", "", text).replace("&nbsp;", " ").strip()
+
+
+# Max characters for ESPN-sourced article bodies (your own manual articles are
+# never truncated). The card links out to the full story on ESPN.
+ESPN_BODY_LIMIT = 500
+
+
+def _truncate(text: str, limit: int) -> str:
+    """Trim to ~limit chars at a word boundary and add an ellipsis."""
+    text = (text or "").strip()
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rstrip()
+    sp = cut.rfind(" ")
+    if sp > 0:
+        cut = cut[:sp]
+    return cut.rstrip(" .,;:—-") + "…"
 
 
 def _news_link(entry: dict) -> str:
