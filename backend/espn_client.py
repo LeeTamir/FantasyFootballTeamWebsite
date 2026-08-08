@@ -288,11 +288,30 @@ def _game_status(p) -> tuple[str, Optional[float]]:
     return "scheduled", gp
 
 
+# Canonical starting-lineup order for the box score.
+_SLOT_ORDER = {"QB": 0, "RB": 1, "WR": 2, "TE": 3, "FLEX": 4, "D/ST": 5, "K": 6}
+
+
+def _slot_display(slot: str) -> str:
+    """Human-friendly slot label. ESPN's flex slot comes through as
+    'RB/WR/TE' (or similar) — show it as 'FLEX'; normalize defense to 'D/ST'."""
+    s = (slot or "").upper()
+    if s in ("DEF", "DST", "D/ST"):
+        return "D/ST"
+    if "/" in s:  # ESPN flex slots: RB/WR/TE, WR/TE, ...
+        return "FLEX"
+    return slot or ""
+
+
+def _slot_rank(slot: str) -> int:
+    return _SLOT_ORDER.get(_slot_display(slot).upper(), 90)
+
+
 def _matchup_player(p) -> dict:
     status, gp = _game_status(p)
     return {
         "name": getattr(p, "name", ""),
-        "slot": getattr(p, "slot_position", ""),
+        "slot": _slot_display(getattr(p, "slot_position", "")),
         "position": getattr(p, "position", ""),
         "proTeam": getattr(p, "proTeam", ""),
         "proOpponent": getattr(p, "pro_opponent", ""),
@@ -305,6 +324,9 @@ def _matchup_player(p) -> dict:
 
 def _team_side(team, lineup) -> dict:
     starters = [p for p in lineup if _is_starter(getattr(p, "slot_position", ""))]
+    # Show in a consistent lineup order (QB, RB, WR, TE, FLEX, D/ST, K) rather
+    # than ESPN's draft/roster order.
+    starters.sort(key=lambda p: _slot_rank(getattr(p, "slot_position", "")))
     proj = sum((getattr(p, "projected_points", 0) or 0) for p in starters)
     return {
         "teamName": getattr(team, "team_name", "Bye") if team else "Bye",
@@ -316,45 +338,67 @@ def _team_side(team, lineup) -> dict:
 
 def _demo_matchup(week: Optional[int]) -> dict:
     """Sample box score + odds for previewing the UI before the season starts.
-    Enabled by setting DEMO_MATCHUP=1; short-circuits real ESPN data. The opponent
-    projection is varied per week so the odds show a range (favorite / dog / pick'em)."""
-    def pl(name, slot, pos, team, opp, proj, pts, status, gp):
-        return {"name": name, "slot": slot, "position": pos, "proTeam": team,
-                "proOpponent": opp, "projected": proj, "points": pts,
-                "gameStatus": status, "gamePlayed": gp}
+    Enabled by setting DEMO_MATCHUP=1; short-circuits real ESPN data. Projections,
+    scores, totals and odds all vary deterministically per week, so week 2 looks
+    different from week 1 (mirroring ESPN's real weekly projections)."""
     seed = week or 1
-    me_proj = 121.4
-    opp_proj = round(108 + ((seed * 7) % 31), 1)  # deterministic weekly variety
-    me = {
-        "teamName": TEAM_NAME or "Lee's Team", "teamAbbrev": "LT",
-        "projected": me_proj, "points": 78.6,
-        "starters": [
-            pl("Patrick Mahomes", "QB", "QB", "KC", "vs DEN", 22.5, 24.8, "final", 100),
-            pl("Bijan Robinson", "RB", "RB", "ATL", "@ CAR", 19.2, 12.4, "live", 55),
-            pl("Saquon Barkley", "RB", "RB", "PHI", "vs DAL", 17.8, 0, "scheduled", 0),
-            pl("Justin Jefferson", "WR", "WR", "MIN", "@ GB", 16.4, 21.0, "final", 100),
-            pl("CeeDee Lamb", "WR", "WR", "DAL", "@ PHI", 15.1, 8.3, "live", 40),
-            pl("Trey McBride", "TE", "TE", "ARI", "vs SF", 11.2, 12.1, "final", 100),
-            pl("Jahmyr Gibbs", "FLEX", "RB", "DET", "vs CHI", 14.0, 0, "scheduled", 0),
-            pl("Harrison Butker", "K", "K", "KC", "vs DEN", 8.5, 9.0, "final", 100),
-            pl("Ravens D/ST", "D/ST", "D/ST", "BAL", "@ CIN", 7.0, -1.0, "live", 30),
-        ],
-    }
-    opp = {
-        "teamName": "Rivals FC", "teamAbbrev": "RIV",
-        "projected": opp_proj, "points": 71.2,
-        "starters": [
-            pl("Josh Allen", "QB", "QB", "BUF", "vs NYJ", 23.1, 20.4, "final", 100),
-            pl("Christian McCaffrey", "RB", "RB", "SF", "@ ARI", 20.0, 6.5, "live", 45),
-            pl("De'Von Achane", "RB", "RB", "MIA", "vs LAR", 15.6, 18.9, "final", 100),
-            pl("Tyreek Hill", "WR", "WR", "MIA", "vs LAR", 16.2, 11.0, "final", 100),
-            pl("Amon-Ra St. Brown", "WR", "WR", "DET", "vs CHI", 14.3, 0, "scheduled", 0),
-            pl("Sam LaPorta", "TE", "TE", "DET", "vs CHI", 10.1, 0, "scheduled", 0),
-            pl("Kyren Williams", "FLEX", "RB", "LAR", "@ MIA", 13.4, 7.9, "live", 45),
-            pl("Jake Elliott", "K", "K", "PHI", "vs DAL", 8.1, 0, "scheduled", 0),
-            pl("Bills D/ST", "D/ST", "D/ST", "BUF", "vs NYJ", 6.8, 6.0, "final", 100),
-        ],
-    }
+
+    def wk_proj(base: float, i: int) -> float:
+        # deterministic weekly wiggle, ~±20% of the player's baseline projection
+        f = 0.80 + (((seed * 7 + i * 13) % 41) / 100.0)  # 0.80 .. 1.20
+        return round(base * f, 1)
+
+    def wk_pts(proj: float, i: int, status: str) -> float:
+        if status == "scheduled":
+            return 0.0
+        f = 0.45 + (((seed * 5 + i * 17) % 100) / 100.0)  # 0.45 .. 1.44 of proj
+        return round(proj * f, 1)
+
+    # (name, slot, pos, proTeam, proOpp, baseProj, status, gamePlayed)
+    me_base = [
+        ("Patrick Mahomes", "QB", "QB", "KC", "vs DEN", 22.5, "final", 100),
+        ("Bijan Robinson", "RB", "RB", "ATL", "@ CAR", 19.2, "live", 55),
+        ("Saquon Barkley", "RB", "RB", "PHI", "vs DAL", 17.8, "scheduled", 0),
+        ("Justin Jefferson", "WR", "WR", "MIN", "@ GB", 16.4, "final", 100),
+        ("CeeDee Lamb", "WR", "WR", "DAL", "@ PHI", 15.1, "live", 40),
+        ("Trey McBride", "TE", "TE", "ARI", "vs SF", 11.2, "final", 100),
+        ("Jahmyr Gibbs", "FLEX", "RB", "DET", "vs CHI", 14.0, "scheduled", 0),
+        ("Ravens D/ST", "D/ST", "D/ST", "BAL", "@ CIN", 7.0, "live", 30),
+        ("Harrison Butker", "K", "K", "KC", "vs DEN", 8.5, "final", 100),
+    ]
+    opp_base = [
+        ("Josh Allen", "QB", "QB", "BUF", "vs NYJ", 23.1, "final", 100),
+        ("Christian McCaffrey", "RB", "RB", "SF", "@ ARI", 20.0, "live", 45),
+        ("De'Von Achane", "RB", "RB", "MIA", "vs LAR", 15.6, "final", 100),
+        ("Tyreek Hill", "WR", "WR", "MIA", "vs LAR", 16.2, "final", 100),
+        ("Amon-Ra St. Brown", "WR", "WR", "DET", "vs CHI", 14.3, "scheduled", 0),
+        ("Sam LaPorta", "TE", "TE", "DET", "vs CHI", 10.1, "scheduled", 0),
+        ("Kyren Williams", "FLEX", "RB", "LAR", "@ MIA", 13.4, "live", 45),
+        ("Bills D/ST", "D/ST", "D/ST", "BUF", "vs NYJ", 6.8, "final", 100),
+        ("Jake Elliott", "K", "K", "PHI", "vs DAL", 8.1, "scheduled", 0),
+    ]
+
+    def build(base_list, offset):
+        starters, proj_total, pts_total = [], 0.0, 0.0
+        for i, (name, slot, pos, team, opp, base, status, gp) in enumerate(base_list):
+            proj = wk_proj(base, i + offset)
+            pts = wk_pts(proj, i + offset, status)
+            proj_total += proj
+            pts_total += pts
+            starters.append({
+                "name": name, "slot": slot, "position": pos, "proTeam": team,
+                "proOpponent": opp, "projected": proj, "points": pts,
+                "gameStatus": status, "gamePlayed": gp,
+            })
+        return starters, round(proj_total, 1), round(pts_total, 1)
+
+    me_starters, me_proj, me_pts = build(me_base, 0)
+    opp_starters, opp_proj, opp_pts = build(opp_base, 100)
+
+    me = {"teamName": TEAM_NAME or "Lee's Team", "teamAbbrev": "LT",
+          "projected": me_proj, "points": me_pts, "starters": me_starters}
+    opp = {"teamName": "Rivals FC", "teamAbbrev": "RIV",
+           "projected": opp_proj, "points": opp_pts, "starters": opp_starters}
     return {
         "week": seed, "status": "live", "me": me, "opp": opp,
         "odds": compute_odds(me_proj, opp_proj, "LT", "RIV"),

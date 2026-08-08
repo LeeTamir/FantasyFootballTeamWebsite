@@ -11,12 +11,15 @@ import playerImg4 from "@/imports/Screenshot_2026-07-25_at_2.16.45_PM.png";
 const TEAM_NAME = "Lee's Team";
 const TEAM_ABBR = "LT";
 const SEASON = "2026";
-const DRAFT_DATE = new Date("2026-08-08T12:00:00-04:00");
+const SEASON_START = new Date("2026-09-09T20:20:00-04:00");
+
+// Meet the Team page is a work in progress — flip to true to re-enable it.
+const ROSTER_ENABLED = false;
 
 // Scrolling headline ticker at the very top of the page.
 // Add your own items here anytime — the first item is the bold "lead".
 const TICKER_ITEMS: { text: string; lead?: boolean }[] = [
-  { text: "⚡ DRAFT DAY APPROACHING — SATURDAY, AUG 8, 2026 · 12:00 PM EST", lead: true },
+  { text: "⚡ SEASON 1 KICKOFF — WEDNESDAY, SEP 9, 2026 · 8:20 PM ET", lead: true },
 ];
 
 // Noun used in the "No … right now." empty state per news filter.
@@ -298,7 +301,7 @@ function RosterPlayerSection({ slot, index }: { slot: RosterSlot; index: number 
             className="text-xs font-bold uppercase tracking-widest"
             style={{ color: "#4b5563", fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: "0.2em" }}
           >
-            Filling · Aug 8, 2026
+            Kickoff · Sep 9, 2026
           </span>
         </div>
       </div>
@@ -786,6 +789,41 @@ function WeekOddsDropdown({ weekNum }: { weekNum: number }) {
   );
 }
 
+function ComingSoon() {
+  return (
+    <div className="relative flex flex-col items-center justify-center text-center overflow-hidden px-4" style={{ minHeight: "70vh" }}>
+      <div
+        className="text-xs font-bold tracking-widest uppercase mb-3"
+        style={{ color: "#c9961a", fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: "0.35em" }}
+      >
+        {SEASON} Season · {TEAM_NAME}
+      </div>
+      <h2
+        className="text-6xl md:text-8xl font-black uppercase leading-none"
+        style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+      >
+        Meet the Team
+      </h2>
+      <div className="h-0.5 w-24 mx-auto mt-5" style={{ background: "linear-gradient(90deg, transparent, #c9961a, transparent)" }} />
+      <div
+        className="mt-8 inline-flex items-center gap-2 px-4 py-2"
+        style={{ border: "1px solid rgba(201,150,26,0.3)", background: "rgba(201,150,26,0.08)" }}
+      >
+        <Users size={16} style={{ color: "#c9961a" }} />
+        <span
+          className="text-sm font-black uppercase"
+          style={{ color: "#c9961a", fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: "0.2em" }}
+        >
+          Coming Soon
+        </span>
+      </div>
+      <p className="mt-5 max-w-sm text-sm" style={{ color: "#6b7280" }}>
+        The full roster is on the way — check back soon.
+      </p>
+    </div>
+  );
+}
+
 function WeekDetailView({ week, matchup, loading, onBack }: { week: number; matchup: Matchup | null; loading: boolean; onBack: () => void }) {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -843,7 +881,7 @@ type NavSection = "home" | "roster" | "news" | "scoreboard";
 export default function App() {
   const [activeSection, setActiveSection] = useState<NavSection>("home");
   const [mobileOpen, setMobileOpen] = useState(false);
-  const countdown = useCountdown(DRAFT_DATE);
+  const countdown = useCountdown(SEASON_START);
 
   // Live ESPN data (falls back to sample content until the backend answers).
   const [team, setTeam] = useState<TeamSummary | null>(null);
@@ -1081,7 +1119,7 @@ export default function App() {
                 style={{ background: "linear-gradient(90deg, transparent, #c9961a, transparent)" }}
               />
               <p className="text-base max-w-md" style={{ color: "#9ca3af" }}>
-                Building a dynasty one pick at a time. The draft is coming — are you ready?
+                Building a dynasty one pick at a time. Season 1 kicks off soon — are you ready?
               </p>
             </div>
           </div>
@@ -1101,7 +1139,7 @@ export default function App() {
                   className="text-sm font-bold uppercase tracking-widest"
                   style={{ color: "#c9961a", fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: "0.25em" }}
                 >
-                  Draft Countdown
+                  Season 1 Kickoff
                 </span>
               </div>
               <div className="grid grid-cols-2 justify-items-center gap-5 md:flex md:justify-center md:gap-6">
@@ -1115,7 +1153,7 @@ export default function App() {
               </div>
               <div className="text-center mt-8">
                 <p className="text-sm" style={{ color: "#6b7280" }}>
-                  Draft day · Saturday, August 8, 2026 · 12:00 PM EST
+                  Kickoff · Wednesday, September 9, 2026 · 8:20 PM ET
                 </p>
               </div>
             </div>
@@ -1156,7 +1194,7 @@ export default function App() {
       )}
 
       {/* ── ROSTER ── */}
-      {activeSection === "roster" && (
+      {activeSection === "roster" && (ROSTER_ENABLED ? (
         <div>
           {/* Section header */}
           <div
@@ -1188,7 +1226,7 @@ export default function App() {
               </h2>
               <div className="h-0.5 w-24 mx-auto mt-5" style={{ background: "linear-gradient(90deg, transparent, #c9961a, transparent)" }} />
               <p className="mt-5 max-w-md mx-auto text-sm leading-relaxed" style={{ color: "#6b7280" }}>
-                16 roster spots. 1 draft. Every position below is a declaration of intent — check back August 8th to see who fills the jersey.
+                16 roster spots. 1 draft. Every position below is a declaration of intent — Season 1 kicks off September 9th.
               </p>
             </div>
           </div>
@@ -1207,14 +1245,16 @@ export default function App() {
               className="text-xs font-bold tracking-widest uppercase"
               style={{ color: "#c9961a", fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: "0.3em" }}
             >
-              16 Positions · Draft Day Aug 8
+              16 Positions · Kickoff Sep 9
             </div>
             <p className="text-xs text-center max-w-xs" style={{ color: "#374151" }}>
               Roster will be updated live following the draft
             </p>
           </div>
         </div>
-      )}
+      ) : (
+        <ComingSoon />
+      ))}
 
       {/* ── NEWS ── */}
       {activeSection === "news" && (

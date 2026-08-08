@@ -16,7 +16,9 @@
       "Bash(npm init *)",
       "Bash(npm run *)",
       "Bash(./backend/venv/bin/python -m py_compile backend/main.py backend/espn_client.py)",
-      "Bash(./venv/bin/python -c \"import os; os.environ.setdefault\\('LEAGUE_ID','1'\\); import main; print\\('FastAPI app loads:', main.app.title\\)\")"
+      "Bash(./venv/bin/python -c \"import os; os.environ.setdefault\\('LEAGUE_ID','1'\\); import main; print\\('FastAPI app loads:', main.app.title\\)\")",
+      "Bash(python3 -c \"import datetime; print\\(datetime.date\\(2026,9,9\\).strftime\\('%A'\\)\\)\")",
+      "Bash(npx tsc *)"
     ],
     "additionalDirectories": [
       "/Users/leetam14/Downloads/Fantasy Football Team Website"
